@@ -16,6 +16,13 @@ $ curl -O https://raw.githubusercontent.com/pettarin/setup-festival-mbrola/maste
 or use the "Download master as ZIP" feature of the
 [GitHub repo](https://github.com/pettarin/setup-festival-mbrola/).
 
+Note: you need to have a compiler
+(e.g., ``gcc`` on Linux, ``Xcode`` command line tools on Mac)
+and the libraries required to compile Festival.
+If the compilation of Festival fails, please read the error message
+printed by its ``configure`` or ``Makefile``,
+and act accordingly.
+
 
 ## Usage
 
@@ -58,13 +65,13 @@ $ bash setup_festival_mbrola.sh mbrola st
 $ bash setup_festival_mbrola.sh festival-mbrola-voices st
 $ export PATH=`pwd`/st/build_festival/festival/bin:$PATH
 $ export PATH=`pwd`/st/build_mbrola:$PATH
-$ echo "Hello world! This is voice_us1_mbrola." | text2wave -eval "(voice_us1_mbrola)" -o /tmp/out.us1_mbrola.wav
+$ echo "Hello world! This is the US 1 MBROLA American English voice." | text2wave -eval "(voice_us1_mbrola)" -o /tmp/out.us1_mbrola.wav
 ```
 
 
 ## License
 
-The scripts and patches this repository
+The scripts and patches in this repository
 are released under the terms of the MIT License.
 
 They should be used for research and/or personal purposes only,
