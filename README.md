@@ -1,10 +1,12 @@
 # setup-festival-mbrola
 
-A Bash script for Linux and Mac OS X to download and install Festival and MBROLA from source.
+A Bash script for Linux and Mac OS X to download/compile/install Festival, MBROLA, and voice files.
 
-* Date: 2016-12-17
-* Version: 1.0.0
-* License: MIT
+* Date: 2016-12-20
+* Version: 1.1.0
+* Developer: [Alberto Pettarin](http://www.albertopettarin.it/)
+* License: the MIT License (MIT)
+* Contact: [click here](http://www.albertopettarin.it/contact.html)
 
 
 ## Download
@@ -13,7 +15,7 @@ A Bash script for Linux and Mac OS X to download and install Festival and MBROLA
 $ curl -O https://raw.githubusercontent.com/pettarin/setup-festival-mbrola/master/setup_festival_mbrola.sh
 ```
 
-or use the "Download master as ZIP" feature of the
+or use the "Download ZIP" feature of the
 [GitHub repo](https://github.com/pettarin/setup-festival-mbrola/).
 
 Note: you need to have a compiler
@@ -28,29 +30,27 @@ and act accordingly.
 
 ```bash
 Usage:
-  $ bash setup_festival_mbrola.sh [clean|clean-all|festival|festival-mbrola-voices|festival-voices|mbrola|mbrola-voices] DESTINATION_DIRECTORY
+  $ bash setup_festival_mbrola.sh PATH_TO_DEST_DIR ACTION
+
+Actions:
+  clean                   delete all DEST_DIR/build_* directories
+  clean-all               delete entire DEST_DIR directory
+  festival                download+compile Festival, install basic English voices
+  festival-mbrola-voices  download+install Festival wrappers for MBROLA
+  festival-voices         download+install all known Festival voices (WARNING: large download)
+  italian                 download+install Italian voices for Festival, including wrappers for MBROLA
+  mbrola                  download MBROLA binary
+  mbrola-voices           download all known MBROLA voices (WARNING: large download)
 
 Examples:
-  $ # download and compile festival and basic English voices
-  $ bash setup_festival_mbrola.sh festival speechtools
-
-  $ # download mbrola executable
-  $ bash setup_festival_mbrola.sh mbrola speechtools
-
-  $ # download and install festival wrappers for mbrola voices
-  $ bash setup_festival_mbrola.sh festival-mbrola-voices speechtools
-
-  $ # download and install additional festival voices (large download!)
-  $ bash setup_festival_mbrola.sh festival-voices speechtools
-
-  $ # download and unpack additional mbrola voices (large download!)
-  $ bash setup_festival_mbrola.sh mbrola-voices speechtools
-
-  $ # delete all speechtools/build_* directories
-  $ bash setup_festival_mbrola.sh clean speechtools
-
-  $ # delete the entire directory speechtools
-  $ bash setup_festival_mbrola.sh clean-all speechtools
+  $ bash setup_festival_mbrola.sh ~/st festival
+  $ bash setup_festival_mbrola.sh ~/st mbrola
+  $ bash setup_festival_mbrola.sh ~/st festival-mbrola-voices
+  $ bash setup_festival_mbrola.sh ~/st italian
+  $ bash setup_festival_mbrola.sh ~/st festival-voices        # WARNING: large download
+  $ bash setup_festival_mbrola.sh ~/st mbrola-voices          # WARNING: large download
+  $ bash setup_festival_mbrola.sh ~/st clean
+  $ bash setup_festival_mbrola.sh ~/st clean-all
 ```
 
 For example, if you want to install Festival, MBROLA,
@@ -60,9 +60,9 @@ and the Festival wrappers for MBROLA voices:
 $ mkdir ~/speechtools
 $ cd ~/speechtools
 $ curl -O https://raw.githubusercontent.com/pettarin/setup-festival-mbrola/master/setup_festival_mbrola.sh
-$ bash setup_festival_mbrola.sh festival st
-$ bash setup_festival_mbrola.sh mbrola st
-$ bash setup_festival_mbrola.sh festival-mbrola-voices st
+$ bash setup_festival_mbrola.sh st festival
+$ bash setup_festival_mbrola.sh st mbrola
+$ bash setup_festival_mbrola.sh st festival-mbrola-voices
 $ export PATH=`pwd`/st/build_festival/festival/bin:$PATH
 $ export PATH=`pwd`/st/build_mbrola:$PATH
 $ echo "Hello world! This is the US 1 MBROLA American English voice." | text2wave -eval "(voice_us1_mbrola)" -o /tmp/out.us1_mbrola.wav

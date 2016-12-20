@@ -1,9 +1,9 @@
-#!/bin/sh
+#!/bin/bash
 
 # __author__ = "Alberto Pettarin"
 # __copyright__ = "Copyright 2016, Alberto Pettarin (www.albertopettarin.it)"
 # __license__ = "MIT"
-# __version__ = "1.0.0"
+# __version__ = "1.1.0"
 # __email__ = "alberto@albertopettarin.it"
 # __status__ = "Production"
 
@@ -27,14 +27,8 @@
 #        | build_mbrola
 #        |   | mbrola (exec)
 #        |
-#        | build_mbrola_voices
-#        |   | several mbrola voice dirs
-#        |
 #        | download_festival
 #        |   | several .tar.gz files
-#        |
-#        | download_festival_mbrola
-#        |   | several .tar.gz or .zip files
 #        |
 #        | download_festival_voices
 #        |   | several .tar.gz files
@@ -50,50 +44,37 @@
 usage() {
     echo ""
     echo "Usage:"
-    echo "  $ bash $0 [clean|clean-all|festival|festival-mbrola-voices|festival-voices|mbrola|mbrola-voices] DESTINATION_DIRECTORY"
+    echo "  $ bash $0 PATH_TO_DEST_DIR ACTION"
+    echo ""
+    echo "Actions:"
+    echo "  clean                   delete all DEST_DIR/build_* directories"
+    echo "  clean-all               delete entire DEST_DIR directory"
+    echo "  festival                download+compile Festival, install basic English voices"
+    echo "  festival-mbrola-voices  download+install Festival wrappers for MBROLA"
+    echo "  festival-voices         download+install all known Festival voices (WARNING: large download)"
+    echo "  italian                 download+install Italian voices for Festival, including wrappers for MBROLA"
+    echo "  mbrola                  download MBROLA binary"
+    echo "  mbrola-voices           download all known MBROLA voices (WARNING: large download)"
     echo ""
     echo "Examples:"
-    echo "  $ # download and compile festival and basic English voices"
-    echo "  $ bash $0 festival speechtools"
-    echo ""
-    echo "  $ # download mbrola executable"
-    echo "  $ bash $0 mbrola speechtools"
-    echo ""
-    echo "  $ # download and install festival wrappers for mbrola voices"
-    echo "  $ bash $0 festival-mbrola-voices speechtools"
-    echo ""
-    echo "  $ # download and install additional festival voices (large download!)"
-    echo "  $ bash $0 festival-voices speechtools"
-    echo ""
-    echo "  $ # download and unpack additional mbrola voices (large download!)"
-    echo "  $ bash $0 mbrola-voices speechtools"
-    echo ""
-    echo "  $ # delete all speechtools/build_* directories"
-    echo "  $ bash $0 clean speechtools"
-    echo ""
-    echo "  $ # delete the entire directory speechtools"
-    echo "  $ bash $0 clean-all speechtools"
+    echo "  $ bash $0 ~/st festival"
+    echo "  $ bash $0 ~/st mbrola"
+    echo "  $ bash $0 ~/st festival-mbrola-voices"
+    echo "  $ bash $0 ~/st italian"
+    echo "  $ bash $0 ~/st festival-voices        # WARNING: large download"
+    echo "  $ bash $0 ~/st mbrola-voices          # WARNING: large download"
+    echo "  $ bash $0 ~/st clean"
+    echo "  $ bash $0 ~/st clean-all"
     echo ""
 }
 
-clean() {
-  R=$1
-  rm -rf "$R/build_festival"
-  rm -rf "$R/build_mbrola"
-  rm -rf "$R/build_mbrola_voices"
-  echo "[INFO] Removed directories $R/build_*"
-}
 
-clean_all() {
-  R=$1
-  if [ -d "$R/build_festival" ] || [ -d "$R/build_mbrola" ] || [ -d "$R/download_festival" ] || [ -d "$R/download_mbrola" ] || [ -d "$R/download_festival_mbrola" ]
-  then
-    rm -rf "$R"
-    echo "[INFO] Removed directory $R"
-  else
-    echo "[ERRO] Directory $R does not look like a valid Festival/MBROLA directory, aborting."
-  fi
-}
+
+###############################################################################
+#
+# HELPER FUNCTIONS
+#
+###############################################################################
 
 ensure_directory() {
   D=$1
@@ -104,21 +85,175 @@ ensure_directory() {
   fi
 }
 
-install_festival() {
+absolute_path() {
+  # from http://stackoverflow.com/a/3915420
+  echo "$(cd "$(dirname "$1")"; pwd)/$(basename "$1")"
+}
+
+get_file() {
   P=`pwd`
   R=$1
-  REPO="download_festival"
-  BUILD="build_festival"
+  REPO=$2
+  URL=$3
+  BASE=`basename $URL`
+
+  ensure_directory "$R"
+  ensure_directory "$R/$REPO"
+
+  echo "[INFO] Downloading file $BASE ..."
+  cd "$R"
+  cd "$REPO"
+  if [ ! -e "$BASE" ]
+  then
+    curl -O "$URL"
+  fi
+  echo "[INFO] Downloading file $BASE ... done"
+
+  cd "$P"
+}
+
+untargz_file() {
+  P=`pwd`
+  R=$1
+  REPO=$2
+  BUILD=$3
+  BASE=$4
 
   ensure_directory "$R"
   ensure_directory "$R/$REPO"
   ensure_directory "$R/$BUILD"
+
+  echo "[INFO] Uncompressing file $BASE ..."
   cd "$R"
+  cd "$BUILD"
+  tar zxvf "../$REPO/$BASE"
+  echo "[INFO] Uncompressing file $BASE ... done"
+
+  cd "$P"
+}
+
+unzip_file() {
+  P=`pwd`
+  R=$1
+  REPO=$2
+  BUILD=$3
+  BASE=$4
+  DEST=$5
+
+  if [ "$DEST" != "" ]
+  then
+    ensure_directory "$R"
+    ensure_directory "$R/$REPO"
+    ensure_directory "$R/$BUILD"
+    ensure_directory "$R/$BUILD/festival/lib/voices/$DEST"
+    cd "$R"
+
+    echo "[INFO] Uncompressing file $BASE ..."
+    unzip -o "$REPO/$BASE" -d "$BUILD/festival/lib/voices/$DEST"
+    echo "[INFO] Uncompressing file $BASE ... done"
+
+    cd "$P"
+  fi
+}
+
+download_uncompress_festival_package() {
+  R=$1
+  REPO=$2
+  BUILD=$3
+  URL=$4
+  BASE=`basename $URL`
+
+  get_file "$R" "$REPO" "$URL"
+  untargz_file "$R" "$REPO" "$BUILD" "$BASE"
+}
+
+download_uncompress_mbrola_voice() {
+  R=$1
+  REPO=$2
+  BUILD=$3
+  URL=$4
+  BASE=`basename $URL`
+
+  get_file "$R" "$REPO" "$URL"
+
+  DEST=""
+  if [ "$BASE" == "en1-980910.zip" ]
+  then
+    DEST="english/en1_mbrola/"
+  elif [ "$BASE" == "us1-980512.zip" ]
+  then
+    DEST="english/us1_mbrola/"
+  elif [ "$BASE" == "us2-980812.zip" ]
+  then
+    DEST="english/us2_mbrola/"
+  elif [ "$BASE" == "us3-990208.zip" ]
+  then
+    DEST="english/us3_mbrola/"
+  elif [ "$BASE" == "it3-010304.zip" ]
+  then
+    DEST="italian/italian/"
+  elif [ "$BASE" == "it4-010926.zip" ]
+  then
+    DEST="italian/italian/"
+  fi
+  unzip_file "$R" "$REPO" "$BUILD" "$BASE" "$DEST"
+}
+
+compile_festival() {
+  P=`pwd`
+  R=$1
+  BUILD=$2
+
+  cd "$R"
+  cd "$BUILD"
+
+  echo "[INFO] Compiling speech tools..."
+  export ESTDIR="$P/speech_tools"
+  cd speech_tools
+  ./configure && make && make make_library
+  cd ..
+  echo "[INFO] Compiling speech tools... done"
+
+  echo "[INFO] Compiling festival..."
+  cd festival
+  ./configure && make
+  cd ..
+  echo "[INFO] Compiling festival... done"
+
+  cd "$P"
+}
+
+
+
+###############################################################################
+#
+# ACTUAL FUNCTIONS
+#
+###############################################################################
+
+clean() {
+  R=$1
+  rm -rf "$R/build_festival"
+  rm -rf "$R/build_mbrola"
+  echo "[INFO] Removed directories $R/build_*"
+}
+
+clean_all() {
+  R=$1
+  if [ -d "$R/build_festival" ] || [ -d "$R/build_mbrola" ] || [ -d "$R/download_festival" ] || [ -d "$R/download_festival_voices" ] || [ -d "$R/download_mbrola" ] || [ -d "$R/download_mbrola_voices" ]
+  then
+    rm -rf "$R"
+    echo "[INFO] Removed directory $R"
+  else
+    echo "[ERRO] Directory $R does not look like a valid Festival/MBROLA directory, aborting."
+  fi
+}
+
+install_festival() {
+  R=$1
+  BUILD="build_festival"
 
   echo "[INFO] Installing Festival..."
-
-  echo "[INFO]   Downloading files..."
-  cd "$REPO"
   #
   # NOTE this will download the minimum number of files required
   #      to have a working Festival with UK and US basic voices:
@@ -134,80 +269,49 @@ install_festival() {
   #      then lexica,
   #      then voices
   #
-  declare -a URLS=(
-    "http://festvox.org/packed/festival/2.4/speech_tools-2.4-release.tar.gz"
-    "http://festvox.org/packed/festival/2.4/festival-2.4-release.tar.gz"
-    "http://festvox.org/packed/festival/2.4/festlex_CMU.tar.gz"
-    "http://festvox.org/packed/festival/2.4/festlex_OALD.tar.gz"
-    "http://festvox.org/packed/festival/2.4/festlex_POSLEX.tar.gz"
-    "http://festvox.org/packed/festival/2.4/voices/festvox_kallpc16k.tar.gz"
-    "http://festvox.org/packed/festival/2.4/voices/festvox_rablpc16k.tar.gz"
-    "http://festvox.org/packed/festival/1.95/festvox_don.tar.gz"
-    "http://festvox.org/packed/festival/1.95/festvox_kedlpc16k.tar.gz"
-  )
-  for URL in "${URLS[@]}"
-  do
-    BASE=`basename $URL`
-    if [ ! -e "$BASE" ]
-    then
-      curl -O "$URL"
-    fi
-  done
-  cd ..
-  echo "[INFO]   Downloading files... done"
+  REPO="download_festival"
+  download_uncompress_festival_package "$R" "$REPO" "$BUILD" "http://festvox.org/packed/festival/2.4/speech_tools-2.4-release.tar.gz"
+  download_uncompress_festival_package "$R" "$REPO" "$BUILD" "http://festvox.org/packed/festival/2.4/festival-2.4-release.tar.gz"
+  download_uncompress_festival_package "$R" "$REPO" "$BUILD" "http://festvox.org/packed/festival/2.4/festlex_CMU.tar.gz"
+  download_uncompress_festival_package "$R" "$REPO" "$BUILD" "http://festvox.org/packed/festival/2.4/festlex_OALD.tar.gz"
+  download_uncompress_festival_package "$R" "$REPO" "$BUILD" "http://festvox.org/packed/festival/2.4/festlex_POSLEX.tar.gz"
 
-  echo "[INFO]   Unpacking files..."
-  cd "$BUILD"
-  #
-  # NOTE here the order of URLS matters!
-  #
-  for URL in "${URLS[@]}"
-  do
-    BASE=`basename $URL`
-    tar zxvf "../$REPO/$BASE"
-  done
-  echo "[INFO]   Unpacking files... done"
+  REPO="download_festival_voices"
+  download_uncompress_festival_package "$R" "$REPO" "$BUILD" "http://festvox.org/packed/festival/2.4/voices/festvox_kallpc16k.tar.gz"
+  download_uncompress_festival_package "$R" "$REPO" "$BUILD" "http://festvox.org/packed/festival/2.4/voices/festvox_rablpc16k.tar.gz"
+  download_uncompress_festival_package "$R" "$REPO" "$BUILD" "http://festvox.org/packed/festival/1.95/festvox_don.tar.gz"
+  download_uncompress_festival_package "$R" "$REPO" "$BUILD" "http://festvox.org/packed/festival/1.95/festvox_kedlpc16k.tar.gz"
 
-  echo "[INFO]   Compiling speech tools..."
-  export ESTDIR=`pwd`/speech_tools
-  cd speech_tools
-  ./configure && make && make make_library
-  cd ..
-  echo "[INFO]   Compiling speech tools... done"
-
-  echo "[INFO]   Compiling festival..."
-  cd festival
-  ./configure && make
-  cd ..
-  cd ..
-  echo "[INFO]   Compiling festival... done"
-
+  compile_festival "$R" "$BUILD"
   echo "[INFO] Installing Festival... done"
 
+  ABS=`absolute_path "$R/$BUILD/festival/bin"`
   echo ""
   echo "[INFO] You might want to append:"
-  echo "[INFO]   $R/$BUILD/festival/bin"
+  echo "[INFO]   $ABS"
   echo "[INFO] to your PATH environment variable."
   echo ""
-
-  cd "$P"
 }
 
 install_festival_voices() {
-  P=`pwd`
   R=$1
   REPO="download_festival_voices"
   BUILD="build_festival"
 
-  ensure_directory "$R"
-  ensure_directory "$R/$REPO"
-  ensure_directory "$R/$BUILD"
-  cd "$R"
-
   echo "[INFO] Installing additional voices..."
-  echo "[INFO]   Downloading files..."
-  cd "$REPO"
   declare -a URLS=(
+    "http://festvox.org/packed/festival/1.95/festvox_cmu_us_awb_arctic_hts.tar.gz"
+    "http://festvox.org/packed/festival/1.95/festvox_cmu_us_bdl_arctic_hts.tar.gz"
+    "http://festvox.org/packed/festival/1.95/festvox_cmu_us_jmk_arctic_hts.tar.gz"
+    "http://festvox.org/packed/festival/1.95/festvox_cmu_us_slt_arctic_hts.tar.gz"
+    "http://festvox.org/packed/festival/1.95/festvox_cstr_us_awb_arctic_multisyn-1.0.tar.gz"
+    "http://festvox.org/packed/festival/1.95/festvox_cstr_us_jmk_arctic_multisyn-1.0.tar.gz"
+    "http://festvox.org/packed/festival/1.95/festvox_don.tar.gz"
+    "http://festvox.org/packed/festival/1.95/festvox_ellpc11k.tar.gz"
+    "http://festvox.org/packed/festival/1.95/festvox_kallpc8k.tar.gz"
+    "http://festvox.org/packed/festival/1.95/festvox_kedlpc16k.tar.gz"
+    "http://festvox.org/packed/festival/1.95/festvox_kedlpc8k.tar.gz"
+    "http://festvox.org/packed/festival/1.95/festvox_rablpc8k.tar.gz"
     "http://festvox.org/packed/festival/2.4/voices/festvox_cmu_us_ahw_cg.tar.gz"
     "http://festvox.org/packed/festival/2.4/voices/festvox_cmu_us_aup_cg.tar.gz"
     "http://festvox.org/packed/festival/2.4/voices/festvox_cmu_us_awb_cg.tar.gz"
@@ -221,40 +325,35 @@ install_festival_voices() {
     "http://festvox.org/packed/festival/2.4/voices/festvox_cmu_us_rms_cg.tar.gz"
     "http://festvox.org/packed/festival/2.4/voices/festvox_cmu_us_rxr_cg.tar.gz"
     "http://festvox.org/packed/festival/2.4/voices/festvox_cmu_us_slt_cg.tar.gz"
-    "http://festvox.org/packed/festival/1.95/festvox_cmu_us_awb_arctic_hts.tar.gz"
-    "http://festvox.org/packed/festival/1.95/festvox_cmu_us_bdl_arctic_hts.tar.gz"
-    "http://festvox.org/packed/festival/1.95/festvox_cmu_us_jmk_arctic_hts.tar.gz"
-    "http://festvox.org/packed/festival/1.95/festvox_cmu_us_slt_arctic_hts.tar.gz"
-    "http://festvox.org/packed/festival/1.95/festvox_cstr_us_awb_arctic_multisyn-1.0.tar.gz"
-    "http://festvox.org/packed/festival/1.95/festvox_cstr_us_jmk_arctic_multisyn-1.0.tar.gz"
-    "http://festvox.org/packed/festival/1.95/festvox_ellpc11k.tar.gz"
-    "http://festvox.org/packed/festival/1.95/festvox_kallpc8k.tar.gz"
-    "http://festvox.org/packed/festival/1.95/festvox_kedlpc8k.tar.gz"
-    "http://festvox.org/packed/festival/1.95/festvox_rablpc8k.tar.gz"
+    "http://festvox.org/packed/festival/2.4/voices/festvox_kallpc16k.tar.gz"
+    "http://festvox.org/packed/festival/2.4/voices/festvox_rablpc16k.tar.gz"
   )
   for URL in "${URLS[@]}"
   do
-    BASE=`basename $URL`
-    if [ ! -e "$BASE" ]
-    then
-      curl -O "$URL"
-    fi
+    download_uncompress_festival_package "$R" "$REPO" "$BUILD" "$URL"
   done
-  cd ..
-  echo "[INFO]   Downloading files... done"
-
-  echo "[INFO]   Unpacking files..."
-  cd "$BUILD"
-  for F in `ls ../$REPO/*.tar.gz`
-  do
-    tar zxvf $F
-  done
-  cd ..
-  echo "[INFO]   Unpacking files... done"
-
   echo "[INFO] Installing additional voices... done"
+}
 
-  cd "$P"
+install_italian() {
+  R=$1
+  BUILD="build_festival"
+
+  echo "[INFO] Installing additional Italian voices..."
+  REPO="download_festival"
+  download_uncompress_festival_package "$R" "$REPO" "$BUILD" "http://www2.pd.istc.cnr.it/FESTIVAL/ifd/italian_scm.tar.gz"
+  download_uncompress_festival_package "$R" "$REPO" "$BUILD" "http://www2.pd.istc.cnr.it/FESTIVAL/ifd/festlex_IFD.tar.gz"
+
+  REPO="download_festival_voices"
+  download_uncompress_festival_package "$R" "$REPO" "$BUILD" "http://www2.pd.istc.cnr.it/FESTIVAL/ifd/festvox_pc_diphone.tar.gz"
+  download_uncompress_festival_package "$R" "$REPO" "$BUILD" "http://www2.pd.istc.cnr.it/FESTIVAL/ifd/festvox_lp_diphone.tar.gz"
+  download_uncompress_festival_package "$R" "$REPO" "$BUILD" "http://www2.pd.istc.cnr.it/FESTIVAL/ifd/festvox_pc_mbrola.tar.gz"
+  download_uncompress_festival_package "$R" "$REPO" "$BUILD" "http://www2.pd.istc.cnr.it/FESTIVAL/ifd/festvox_lp_mbrola.tar.gz"
+
+  REPO="download_mbrola_voices"
+  download_uncompress_mbrola_voice     "$R" "$REPO" "$BUILD" "http://tcts.fpms.ac.be/synthesis/mbrola/dba/it3/it3-010304.zip"
+  download_uncompress_mbrola_voice     "$R" "$REPO" "$BUILD" "http://tcts.fpms.ac.be/synthesis/mbrola/dba/it4/it4-010926.zip"
+  echo "[INFO] Installing additional Italian voices... done"
 }
 
 install_mbrola() {
@@ -283,6 +382,7 @@ install_mbrola() {
     echo "[INFO]   Copying mbrola binary to $BUILD ..."
     unzip mbr301h.zip "mbrola-linux-i386" -d "../$BUILD/"
     mv "../$BUILD/mbrola-linux-i386" "../$BUILD/mbrola"
+    chmod 744 "../$BUILD/mbrola"
     echo "[INFO]   Copying mbrola binary to $BUILD ... done"
 
     DOWNLOADED=1
@@ -304,68 +404,36 @@ install_mbrola() {
     echo "[ERRO]   Unknown OS, aborting."
   fi
 
+  cd "$P"
+  echo "[INFO] Installing mbrola... done"
+
   if [ "$DOWNLOADED" == "1" ]
   then
+    ABS=`absolute_path "$R/$BUILD"`
     echo ""
     echo "[INFO] You might want to append:"
-    echo "[INFO]   $R/$BUILD"
+    echo "[INFO]   $ABS"
     echo "[INFO] to your PATH environment variable."
     echo ""
   fi
-
-  cd ..
-  echo "[INFO] Installing mbrola... done"
-
-  cd "$P"
 }
 
 install_festival_mbrola_voices() {
-  P=`pwd`
   R=$1
-  REPO="download_festival_mbrola"
   BUILD="build_festival"
 
-  ensure_directory "$R"
-  ensure_directory "$R/$REPO"
-  ensure_directory "$R/$BUILD"
-  cd "$R"
-
   echo "[INFO] Installing festival-mbrola voices..."
-  echo "[INFO]   Downloading files..."
-  cd "$REPO"
-  declare -a URLS=(
-    "http://festvox.org/packed/festival/1.95/festvox_en1.tar.gz"
-    "http://festvox.org/packed/festival/1.95/festvox_us1.tar.gz"
-    "http://festvox.org/packed/festival/1.95/festvox_us2.tar.gz"
-    "http://festvox.org/packed/festival/1.95/festvox_us3.tar.gz"
-    "http://tcts.fpms.ac.be/synthesis/mbrola/dba/en1/en1-980910.zip"
-    "http://tcts.fpms.ac.be/synthesis/mbrola/dba/us1/us1-980512.zip"
-    "http://tcts.fpms.ac.be/synthesis/mbrola/dba/us2/us2-980812.zip"
-    "http://tcts.fpms.ac.be/synthesis/mbrola/dba/us3/us3-990208.zip"
-  )
-  for URL in "${URLS[@]}"
-  do
-    BASE=`basename $URL`
-    if [ ! -e "$BASE" ]
-    then
-      curl -O "$URL"
-    fi
-  done
-  cd ..
-  echo "[INFO]   Downloading files... done"
+  REPO="download_festival_voices"
+  download_uncompress_festival_package "$R" "$REPO" "$BUILD" "http://festvox.org/packed/festival/1.95/festvox_en1.tar.gz"
+  download_uncompress_festival_package "$R" "$REPO" "$BUILD" "http://festvox.org/packed/festival/1.95/festvox_us1.tar.gz"
+  download_uncompress_festival_package "$R" "$REPO" "$BUILD" "http://festvox.org/packed/festival/1.95/festvox_us2.tar.gz"
+  download_uncompress_festival_package "$R" "$REPO" "$BUILD" "http://festvox.org/packed/festival/1.95/festvox_us3.tar.gz"
 
-  echo "[INFO]   Unpacking files..."
-  cd "$BUILD"
-  for F in `ls ../$REPO/*.tar.gz`
-  do
-    tar zxvf $F
-  done
-  cd ..
-  unzip -o "$REPO/en1-980910.zip" -d "$BUILD/festival/lib/voices/english/en1_mbrola/"
-  unzip -o "$REPO/us1-980512.zip" -d "$BUILD/festival/lib/voices/english/us1_mbrola/"
-  unzip -o "$REPO/us2-980812.zip" -d "$BUILD/festival/lib/voices/english/us2_mbrola/"
-  unzip -o "$REPO/us3-990208.zip" -d "$BUILD/festival/lib/voices/english/us3_mbrola/"
-  echo "[INFO]   Unpacking files... done"
+  REPO="download_mbrola_voices"
+  download_uncompress_mbrola_voice     "$R" "$REPO" "$BUILD" "http://tcts.fpms.ac.be/synthesis/mbrola/dba/en1/en1-980910.zip"
+  download_uncompress_mbrola_voice     "$R" "$REPO" "$BUILD" "http://tcts.fpms.ac.be/synthesis/mbrola/dba/us1/us1-980512.zip"
+  download_uncompress_mbrola_voice     "$R" "$REPO" "$BUILD" "http://tcts.fpms.ac.be/synthesis/mbrola/dba/us2/us2-980812.zip"
+  download_uncompress_mbrola_voice     "$R" "$REPO" "$BUILD" "http://tcts.fpms.ac.be/synthesis/mbrola/dba/us3/us3-990208.zip"
 
   UNAME=`uname`
   if [ "$UNAME" == "Darwin" ]
@@ -373,42 +441,23 @@ install_festival_mbrola_voices() {
     echo "[INFO]   Downloading and patching Festival wrappers for mbrola 3.01d ..."
     # on Mac OS X only mbrola 3.01d is available,
     # hence we need to download the patched Festival wrappers
-    cd "$P"
-    cd "$R"
-    cd "$REPO"
-    curl -O "https://raw.githubusercontent.com/pettarin/setup-festival-mbrola/master/dist/patch_mbrola_301d.tar.gz"
-    cd ..
-    cd "$BUILD"
-    tar zxvf "../$REPO/patch_mbrola_301d.tar.gz"
-    cd ..
-    cd "$P"
+    REPO="download_mbrola"
+    URL="https://raw.githubusercontent.com/pettarin/setup-festival-mbrola/master/dist/patch_mbrola_301d.tar.gz"
+    download_uncompress_festival_package "$R" "$REPO" "$BUILD" "$URL"
     echo "[INFO]   Downloading and patching Festival wrappers for mbrola 3.01d ... done"
   fi
 
   echo "[INFO] Installing festival-mbrola voices... done"
-
-  cd "$P"
 }
 
-download_mbrola_voices() {
+get_mbrola_voices() {
   P=`pwd`
   R=$1
   REPO="download_mbrola_voices"
-  BUILD="build_mbrola_voices"
 
-  ensure_directory "$R"
-  ensure_directory "$R/$REPO"
-  ensure_directory "$R/$BUILD"
-  cd "$R"
-
-  echo "[INFO] Installing additional mbrola voices..."
-  echo "[INFO]   Downloading files..."
-  cd "$REPO"
+  echo "[INFO] Downloading additional mbrola voices..."
   declare -a URLS=(
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/af1/af1.zip"
-    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/us1/us1-980512.zip"
-    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/us2/us2-980812.zip"
-    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/us3/us3-990208.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/ar1/ar1-981103.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/ar2/ar2-001015.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/br1/br1-971105.zip"
@@ -416,26 +465,12 @@ download_mbrola_voices() {
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/br3/br3-000119.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/br4/br4.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/bz1/bz1-980116.zip"
-    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/en1/en1-980910.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/ca1/ca1.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/ca2/ca2.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/cn1/cn1.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/cr1/cr1-981028.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/cz1/cz1-991020.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/cz2/cz2-001009.zip"
-    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/nl1/nl1-980609.zip"
-    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/nl2/nl2-990507.zip"
-    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/nl3/nl3-001013.zip"
-    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/nz1/nz1-000911.zip"
-    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/ee1/ee1.zip"
-    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/pt1/pt1-000509.zip"
-    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/fr1/fr1-990204.zip"
-    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/fr2/fr2-980806.zip"
-    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/fr3/fr3-990324.zip"
-    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/fr4/fr4-990521.zip"
-    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/fr5/fr5-991020.zip"
-    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/fr6/fr6-010330.zip"
-    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/fr7/fr7-010330.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/de1/de1-980227.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/de2/de2-990106.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/de3/de3-000307.zip"
@@ -444,10 +479,19 @@ download_mbrola_voices() {
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/de6/de6.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/de7/de7.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/de8/de8.zip"
+    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/ee1/ee1.zip"
+    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/en1/en1-980910.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/es1/es1-980610.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/es2/es2-989825.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/es3/es3.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/es4/es4.zip"
+    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/fr1/fr1-990204.zip"
+    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/fr2/fr2-980806.zip"
+    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/fr3/fr3-990324.zip"
+    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/fr4/fr4-990521.zip"
+    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/fr5/fr5-991020.zip"
+    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/fr6/fr6-010330.zip"
+    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/fr7/fr7-010330.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/gr1/gr1-990610.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/gr2/gr2-010521.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/hb1/hb1-000308.zip"
@@ -470,45 +514,39 @@ download_mbrola_voices() {
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/lt1/lt1.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/lt2/lt2.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/ma1/ma1.zip"
-    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/pl1/pl1.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/mx1/mx1-990208.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/mx2/mx2.zip"
+    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/nl1/nl1-980609.zip"
+    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/nl2/nl2-990507.zip"
+    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/nl3/nl3-001013.zip"
+    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/nz1/nz1-000911.zip"
+    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/pl1/pl1.zip"
+    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/pt1/pt1-000509.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/ro1/ro1-980317.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/sw1/sw1-980623.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/sw2/sw2-140102.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/tl1/tl1.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/tr1/tr1-010209.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/tr2/tr2-010212.zip"
+    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/us1/us1-980512.zip"
+    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/us2/us2-980812.zip"
+    "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/us3/us3-990208.zip"
     "http://www.tcts.fpms.ac.be/synthesis/mbrola/dba/vz1/vz1.zip"
   )
   for URL in "${URLS[@]}"
   do
-    BASE=`basename $URL`
-    if [ ! -e "$BASE" ]
-    then
-      curl -O "$URL"
-    fi
+    get_file "$R" "$REPO" "$URL"
   done
-  cd ..
-  echo "[INFO]   Downloading files... done"
-
-  echo "[INFO]   Unpacking files..."
-  cd "$BUILD"
-  for F in `ls ../$REPO/*zip`
-  do
-    unzip "$F" -d .
-  done
-  cd ..
-  echo "[INFO]   Unpacking files... done"
-
-  echo "[INFO] Installing additional mbrola voices... done"
-
-  cd "$P"
+  echo "[INFO] Downloading additional mbrola voices... done"
 }
 
 
 
-# NOTE begin of the main script
+###############################################################################
+#
+# MAIN SCRIPT
+#
+###############################################################################
 
 if [ "$#" -lt "2" ]
 then
@@ -516,8 +554,8 @@ then
   exit 2
 fi
 
-ACTION=$1
-DESTINATION=$2
+DESTINATION=$1
+ACTION=$2
 
 if [ "$ACTION" == "clean" ]
 then
@@ -539,7 +577,10 @@ then
   install_festival_mbrola_voices "$DESTINATION"
 elif [ "$ACTION" == "mbrola-voices" ]
 then
-  download_mbrola_voices "$DESTINATION"
+  get_mbrola_voices "$DESTINATION"
+elif [ "$ACTION" == "italian" ]
+then
+  install_italian "$DESTINATION"
 else
   usage
   exit 2
